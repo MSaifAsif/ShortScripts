@@ -15,11 +15,12 @@ import sys
 import time
 import random
 import logging
+logger=logging.getLogger("khubsurat")
 
 unix_epoch = '2014-01-01 00:00:01'
 
 
-def main(no_users, no_services, invalid_rows):
+def main(no_users, logs_per_user, invalid_rows):
     try:
         filename = str(int(time.time())) + str(no_users) + "_data.tsv"
         new_file = open("cws_data/" + filename, 'w')
@@ -27,10 +28,10 @@ def main(no_users, no_services, invalid_rows):
         service_url_file = open("unique_urls_cws.csv", "r")
         useragent_file = open("unique_user_agents.csv", "r")
         destip_file = open("unique_dest_ip.csv", "r")
-        log_file = open("logs/log_file.log", "rw")
-        index = 0
+        row_index = 0
         no_users = int(no_users)
-        no_services = int(no_services)
+        #no_services = int(no_services)
+        logs_per_user = int(logs_per_user)
         invalid_rows = int(invalid_rows)
         users = user_ip_file.readlines()
         services = service_url_file.readlines()
@@ -38,36 +39,43 @@ def main(no_users, no_services, invalid_rows):
         dest_ip = destip_file.readlines()
         print "**************************************"
         print "Generating Valid Data"
+
+        #Writing Valid Rows to the file
         for user in range(0, no_users):
-            for service in range(0, no_services):
+            user_index = 0
+            for logs in range(0, logs_per_user):
                 s_bytes = random.randint(100, 1000)
                 r_bytes = random.randint(100, 1000)
+                service = services[random.randint(0,20000)]
+                user_agents = user_agent[random.randint(0,995)]
                 new_file.write(
                     "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                        get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].split(":")[0],
-                        services[service].split("//")[1].strip(), user_agent[service].strip(), s_bytes, r_bytes,
-                        dest_ip[service].strip(), users[user].strip()))
-                index += 1
-        print "Total Rows Added %d" % index
+                    get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
+                    service.split("//")[1].strip(), user_agents.strip(), s_bytes, r_bytes,
+                    dest_ip[logs_per_user].strip(), users[user].strip()))
+                user_index += 1
+            print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
+            row_index += 1
+
+        # Writing Invalid Rows to the file
+        print "Total Valid Rows Added%d" % row_index
         print "Generating Invalid Data"
         for rows in range(0, invalid_rows):
             s_bytes = random.randint(100, 1000)
             r_bytes = random.randint(100, 1000)
             new_file.write(
                 "%s\t%s\t\t%s\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                    get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].split(":")[0],
-                    user_agent[service].strip(), s_bytes, r_bytes, users[user].strip()))
-
+                    get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
+                    user_agents.strip(), s_bytes, r_bytes, users[user].strip()))
         print "Total Rows Added %d" % invalid_rows
-        print "Data File of name cws_data/%s with %d user(s) and %d service URL(s) Generated." % (
-            filename, no_users, no_services)
+        print "Data File of name cws_data/%s with %d user(s)." % (
+            filename, no_users)
         print "**************************************"
     except Exception, e:
-        print e
+        logger.exception(e)
         raise e
     finally:
         new_file.close()
-        log_file.close()
 
 def get_new_date(current_epoch):
     date, time = current_epoch.split()
@@ -82,27 +90,9 @@ def get_new_date(current_epoch):
     mins = int(time_elems[1])
     secs = int(time_elems[2])
 
-    if day == 28:
-        day = 1
-        month += 1
-
-    if month == 12:
-        month = 1
-        year += 1
-
-    secs += 1
-
-    if secs == 59:
-        secs = 0
-        mins += 1
-
-    if mins == 59:
-        mins = 0
-        hour += 1
-
-    if hour == 23:
-        hour = 0
-        day = 1
+    secs = random.randint(0,59)
+    mins = random.randint(0,59)
+    hour = random.randint(0,23)
 
     month_impl = str(month)
     if len(month_impl) == 1:
@@ -133,4 +123,4 @@ if __name__ == '__main__':
     if len(sys.argv) == 4:
         main(sys.argv[1], sys.argv[2], sys.argv[3])
     else:
-        print "Usage: python data_gen_1031.py Users Services Invalid_Rows"
+        print "Usage: python data_gen_cws.py Users Logs_Per_User Invalid_Rows"
