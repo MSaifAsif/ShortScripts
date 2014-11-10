@@ -15,7 +15,7 @@ import sys
 import time
 import random
 import logging
-logger=logging.getLogger("khubsurat")
+logger=logging.getLogger("Data_Gen_Logger:")
 
 unix_epoch = '2014-01-01 00:00:01'
 
@@ -23,14 +23,13 @@ unix_epoch = '2014-01-01 00:00:01'
 def main(no_users, logs_per_user, invalid_rows):
     try:
         filename = str(int(time.time())) + str(no_users) + "_data.tsv"
-        new_file = open("cws_data/" + filename, 'w')
+        new_file = open("../cws_data/" + filename, 'w')
         user_ip_file = open("user_ips.csv", 'r')
         service_url_file = open("unique_urls_cws.csv", "r")
         useragent_file = open("unique_user_agents.csv", "r")
         destip_file = open("unique_dest_ip.csv", "r")
         row_index = 0
         no_users = int(no_users)
-        #no_services = int(no_services)
         logs_per_user = int(logs_per_user)
         invalid_rows = int(invalid_rows)
         users = user_ip_file.readlines()
@@ -46,8 +45,8 @@ def main(no_users, logs_per_user, invalid_rows):
             for logs in range(0, logs_per_user):
                 s_bytes = random.randint(100, 1000)
                 r_bytes = random.randint(100, 1000)
-                service = services[random.randint(0,20000)]
-                user_agents = user_agent[random.randint(0,995)]
+                service = services[random.randint(0,200000)]
+                user_agents = user_agent[random.randint(0,990)]
                 new_file.write(
                     "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
                     get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
@@ -58,7 +57,7 @@ def main(no_users, logs_per_user, invalid_rows):
             row_index += 1
 
         # Writing Invalid Rows to the file
-        print "Total Valid Rows Added%d" % row_index
+        print "Total Valid Rows Added: %d" % row_index
         print "Generating Invalid Data"
         for rows in range(0, invalid_rows):
             s_bytes = random.randint(100, 1000)
@@ -68,7 +67,7 @@ def main(no_users, logs_per_user, invalid_rows):
                     get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
                     user_agents.strip(), s_bytes, r_bytes, users[user].strip()))
         print "Total Rows Added %d" % invalid_rows
-        print "Data File of name cws_data/%s with %d user(s)." % (
+        print "Data File of name ../cws_data/%s with %d user(s)." % (
             filename, no_users)
         print "**************************************"
     except Exception, e:
