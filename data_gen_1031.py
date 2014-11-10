@@ -2,7 +2,7 @@
 
 '''
 Author: "Asim Kazmi" <asim.kazmi@elastica.co>
-Rev : 1.0 2014-10-23
+Rev : 1.0 2014-11-10
 
 Desc: Firewall Data Generation Tool to create large Synthetic Log files for Different Firewalls.
 
@@ -20,41 +20,43 @@ unix_epoch = '2014-01-01 00:00:01'
 
 def main(no_users, no_services):
     try:
-        filename = int(time.time())
-        print filename
-        new_file = open(int(time.time())+"testdata.tsv", 'w')
+        filename = str(int(time.time()))+str(no_users)+"_data.tsv"
+        new_file = open(filename, 'w')
         user_ip_file = open("user_ips.csv", 'r')
-        service_url_file = open("service_urls.csv", "r")
+        service_url_file = open("unique_urls_cws.csv", "r")
         useragent_file = open("unique_user_agents.csv", "r")
         destip_file = open("unique_dest_ip.csv", "r")
-        index = 1
+        index = 0
         no_users=int(no_users)
         no_services=int(no_services)
         users = user_ip_file.readlines()
         services = service_url_file.readlines()
         user_agent= useragent_file.readlines()
         dest_ip = destip_file.readlines()
+        print "**************************************"
+        print "Generating Valid Data"
         for user in range(0, no_users):
             for service in range (0, no_services):
                 s_bytes = random.randint(100,1000)
                 r_bytes = random.randint(100,1000)
-                print s_bytes, r_bytes
-                new_file.write("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n" % (get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].strip(),user_agent[service].strip(),s_bytes,r_bytes,dest_ip[service].strip()))
-                ##new_file.write("%s\t%s\t\t%s\tGET\thttp\t%s\t80\t\t\t%s\t-\t\t100\t200\timage/jpeg\t74.125.229.172\tc:infr\tdefault\tallow\t\t\t190.143.125.98\t1278716032\t\n" % (get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].strip(),user_agent[service].strip())
-                print "Adding New Row to line %d" % index
+                new_file.write("%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].split(":")[0], services[service].split("//")[1].strip(),user_agent[service].strip(),s_bytes,r_bytes,dest_ip[service].strip(),users[user].strip()))
                 index += 1
         print "Total Rows Added %d" % index
         empty_index = index
         index = 0
-        while index != 100:
+        print "Generating Invalid Data"
+        print empty_index / 10
+        while index !=  1000:
             s_bytes = random.randint(100,1000)
             r_bytes = random.randint(100,1000)
-            new_file.write("%s\t%s\t%s\t**********\t%s\t%d\t%d\t%s\n" % (get_new_date(unix_epoch), users[user].strip(), users[user].strip(),user_agent[service].strip(),s_bytes,r_bytes,dest_ip[service].strip()))
-            print "Adding New Invalid Row to line %d" % index
-            index += 1
+            new_file.write("%s\t%s\t\t%s\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (get_new_date(unix_epoch), users[user].strip(), users[user].strip(), services[service].split(":")[0], user_agent[service].strip(), s_bytes, r_bytes, users[user].strip()))
             empty_index -= 1
+            index +=1
+
 
         print "Total Rows Added %d" % index
+        print "Data File of name %s with %d user(s) and %d service URL(s) Generated." % (filename, no_users, no_services)
+        print "**************************************"
     except Exception, e:
         print e
         raise e
