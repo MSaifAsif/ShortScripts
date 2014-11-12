@@ -17,15 +17,17 @@ import sys
 import time
 import random
 import logging
+import gzip
 
-logger=logging.getLogger("Data_Gen_Logger:")
-unix_epoch = '2014-10-01 00:00:01'
+logger = logging.basicConfig()
+timestamp_format = '2014-10-01 00:00:01'
 
 
 def main(no_users, logs_per_user, invalid_rows, format):
     try:
-        filename = str(int(time.time())) + str(no_users) + "_data.tsv"
-        new_file = open("../cws_data/" + filename, 'w')
+        data_path = "../cws_data/"
+        filename = str(int(time.time())) + "-day-" + str(timestamp_format[5]) + "-data.tsv"
+        new_file = open(data_path + filename, 'wb')
         user_ip_file = open("user_ips.csv", 'r')
         service_url_file = open("unique_urls_cws.csv", "r")
         useragent_file = open("unique_user_agents.csv", "r")
@@ -38,57 +40,66 @@ def main(no_users, logs_per_user, invalid_rows, format):
         user_agent = useragent_file.readlines()
         dest_ip = destip_file.readlines()
 
-        #Verify the provided format from console input. CWS, WSA, ASA etc.
+        # Verify the provided format from console input. CWS, WSA, ASA etc.
         if str(format) == "CWS":
-            write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, services, user_agent, dest_ip, new_file)
+            write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, services, user_agent, dest_ip,
+                           new_file)
         else:
             print "\nInvalid Format. Please provide a value like CWS"
     except Exception, e:
         logger.exception(e)
-        raise e
+        sys.exit(1)
     finally:
-        print "Exiting Program.\n"
-        exit()
-
+        print "Exiting Program...\n"
+        sys.exit(0)
 
 
 def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, services, user_agent, dest_ip, new_file):
     row_index = 0
     try:
         print "**************************************"
-        print "Generating Valid Data"
+        print "Generating Valid Data..."
 
         # Writing Valid Rows to the file
         # User Loop to pick number of users from the user file based on the input value
         for user in range(0, no_users):
             user_index = 0
+            agent_index = 0
+            dest_index = 0
             # Loop to Generate Log per user.
             for logs in range(0, logs_per_user):
-
                 # Randomizing sent and received bytes
                 s_bytes = random.randint(100, 2000)
                 r_bytes = random.randint(100, 2000)
 
                 # Randomizing the service array pick value
-                service = services[random.randint(0,200000)]
+                service = services[random.randint(no_users, 200000)]
 
-                # Randomizing the user agents to have unique agents picked for each user.
-                user_agents = user_agent[random.randint(0,990)]
 
                 # Writing the Data Rows for each user. Parameterized Fields include Username, Service name, Sent Bytes,
-                # Received bytes, User Agent, destination IP and uri scheme
+                # Received bytes, User Agent, destination IP and uri scheme. User Agensts are selected one for each user.
                 new_file.write(
                     "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                    get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
-                    service.split("//")[1].strip(), user_agents.strip(), s_bytes, r_bytes,
-                    dest_ip[logs_per_user].strip(), users[user].strip()))
+                        get_new_date(timestamp_format), users[user].strip(), users[user].strip(), service.split(":")[0],
+                        service.split("//")[1].strip(), user_agent[agent_index].strip(), s_bytes, r_bytes,
+                        dest_ip[dest_index].strip(), users[user].strip()))
                 user_index += 1
-            print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
-            row_index += 1
+                row_index += 1
+
+                # Since the total number of user agents may not be equal to the total number of users.
+                if agent_index == len(user_agent):
+                    agent_index = 0
+
+                # Since the total number of destination IPs may not be equal to the total number of users.
+                if dest_index == len(dest_ip):
+                    dest_index = 0
+
+                # print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
+
 
         # Writing Invalid Rows to the file
         print "Total Valid Rows Added: %d" % row_index
-        print "Generating Invalid Data"
+        print "Generating Invalid Data..."
         for rows in range(0, invalid_rows):
             s_bytes = random.randint(100, 1000)
             r_bytes = random.randint(100, 1000)
@@ -96,17 +107,17 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
             # To make a data row invalid, serviceip contains hardcoded * signs and 0.0.0.0 as destination IP.
             new_file.write(
                 "%s\t%s\t\t%s\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                    get_new_date(unix_epoch), users[user].strip(), users[user].strip(), service.split(":")[0],
+                    get_new_date(timestamp_format), users[user].strip(), users[user].strip(), service.split(":")[0],
                     user_agents.strip(), s_bytes, r_bytes, users[user].strip()))
-        print "Total Rows Added %d" % invalid_rows
-        print "Data File of name ../cws_data/%s with %d user(s)." % (
-            filename, no_users)
+            print "."
+        print "Total Invalid Rows Added %d" % invalid_rows
+        print "Data File of name ../cws_data/%s with %d user(s)." % (filename, no_users)
         print "**************************************"
     except Exception, e:
         logger.exception(e)
-        raise e
     finally:
         new_file.close()
+
 
 # This function Generates Random time stamp witin a day range
 def get_new_date(current_epoch):
@@ -123,9 +134,9 @@ def get_new_date(current_epoch):
     secs = int(time_elems[2])
 
     # Randomizing the timestamp with random hours, mins and seconds.
-    secs = random.randint(0,59)
-    mins = random.randint(0,59)
-    hour = random.randint(0,23)
+    secs = random.randint(0, 59)
+    mins = random.randint(0, 59)
+    hour = random.randint(0, 23)
 
     month_impl = str(month)
     if len(month_impl) == 1:
@@ -147,11 +158,12 @@ def get_new_date(current_epoch):
     if len(min_impl) == 1:
         min_impl = '0' + min_impl
 
-    global unix_epoch
-    unix_epoch = str(year) + '-' + month_impl + '-' + day_impl + ' ' + hour_impl + ':' + min_impl + ':' + secs_impl
-    return unix_epoch
+    global timestamp_format
+    timestamp_format = str(
+        year) + '-' + month_impl + '-' + day_impl + ' ' + hour_impl + ':' + min_impl + ':' + secs_impl
+    return timestamp_format
 
-# Constructor for Main function
+
 if __name__ == '__main__':
     if len(sys.argv) == 5:
         main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
