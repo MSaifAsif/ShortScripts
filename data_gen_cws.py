@@ -12,6 +12,7 @@ Revisions:
 2.0 - Support added for randomizing output of time stamp, useragents, destination IPs etc.
 """
 
+import os
 import re
 import sys
 import time
@@ -26,7 +27,7 @@ timestamp_format = '2014-10-01 00:00:01'
 def main(no_users, logs_per_user, invalid_rows, format):
     try:
         data_path = "../cws_data/"
-        filename = str(int(time.time())) + "-day-" + str(timestamp_format[5]) + "-data.tsv"
+        filename = str(int(time.time())) + "-day-" + str(timestamp_format[5]) + "-data"
         new_file = open(data_path + filename, 'wb')
         user_ip_file = open("user_ips.csv", 'r')
         service_url_file = open("unique_urls_cws.csv", "r")
@@ -56,6 +57,9 @@ def main(no_users, logs_per_user, invalid_rows, format):
 
 def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, services, user_agent, dest_ip, new_file):
     row_index = 0
+    service_range_start = 1
+    service_range_end = 100
+            
     try:
         print "**************************************"
         print "Generating Valid Data..."
@@ -66,22 +70,21 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
             user_index = 0
             agent_index = 0
             dest_index = 0
+
             # Loop to Generate Log per user.
             for logs in range(0, logs_per_user):
+
                 # Randomizing sent and received bytes
                 s_bytes = random.randint(100, 2000)
                 r_bytes = random.randint(100, 2000)
-
-                # Randomizing the service array pick value
-                service = services[random.randint(no_users, 200000)]
-
+                service_list= random.randint(service_range_start, service_range_end)
 
                 # Writing the Data Rows for each user. Parameterized Fields include Username, Service name, Sent Bytes,
                 # Received bytes, User Agent, destination IP and uri scheme. User Agensts are selected one for each user.
                 new_file.write(
                     "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                        get_new_date(timestamp_format), users[user].strip(), users[user].strip(), service.split(":")[0],
-                        service.split("//")[1].strip(), user_agent[agent_index].strip(), s_bytes, r_bytes,
+                        get_new_date(timestamp_format), users[user].strip(), users[user].strip(), services[service_list].split(":")[0],
+                        services[service_list].split("//")[1].strip(), user_agent[agent_index].strip(), s_bytes, r_bytes,
                         dest_ip[dest_index].strip(), users[user].strip()))
                 user_index += 1
                 row_index += 1
@@ -93,28 +96,37 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
                 # Since the total number of destination IPs may not be equal to the total number of users.
                 if dest_index == len(dest_ip):
                     dest_index = 0
-
+            
+            service_range_start +=100
+            service_range_end += 100
+            
                 # print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
 
+        print "Total Valid Rows Added: %d" % row_index
 
         # Writing Invalid Rows to the file
-        print "Total Valid Rows Added: %d" % row_index
         print "Generating Invalid Data..."
+
+
         for rows in range(0, invalid_rows):
             s_bytes = random.randint(100, 1000)
             r_bytes = random.randint(100, 1000)
 
             # To make a data row invalid, serviceip contains hardcoded * signs and 0.0.0.0 as destination IP.
+            # Username is set by default to INVALID_User. These logs should not be detected during data processing.
             new_file.write(
-                "%s\t%s\t\t%s\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
-                    get_new_date(timestamp_format), users[user].strip(), users[user].strip(), service.split(":")[0],
-                    user_agents.strip(), s_bytes, r_bytes, users[user].strip()))
-            print "."
+                "%s\t%s\t\tInvalid_User\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
+                    get_new_date(timestamp_format), users[user].strip(), services[invalid_rows].split(":")[0],
+                    user_agent[invalid_rows].strip(), s_bytes, r_bytes, users[user].strip()))
+
         print "Total Invalid Rows Added %d" % invalid_rows
-        print "Data File of name ../cws_data/%s with %d user(s)." % (filename, no_users)
+        os.system("sort ../cws_data/%s -k 1 > ../cws_data/%s_sorted.tsv" % (filename, filename))
+        os.system("gzip ../cws_data/%s_sorted.tsv" % filename)
+        print "Data File of name ../cws_data/%s_sorted.tsv.gz with %d user(s)." % (filename, no_users)
         print "**************************************"
     except Exception, e:
-        logger.exception(e)
+        #logger.exception(e)
+        print str(e)
     finally:
         new_file.close()
 
@@ -165,9 +177,11 @@ def get_new_date(current_epoch):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 5:
-        main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
-    else:
-        print "Usage: python data_gen_cws.py Users Logs_Per_User Invalid_Rows Format"
-        print "Example: python data_gen_cws.py 10 10 10 CWS"
+     if len(sys.argv) == 5:
+         main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+     else:
+         print "Usage: python data_gen_cws.py Users Logs_Per_User Invalid_Rows Format"
+         print "Example: python data_gen_cws.py 10 10 10 CWS"
+
+
 
