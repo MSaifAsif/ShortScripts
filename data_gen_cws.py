@@ -120,8 +120,11 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
                     user_agent[invalid_rows].strip(), s_bytes, r_bytes, users[user].strip()))
 
         print "Total Invalid Rows Added %d" % invalid_rows
+
+        # Sorting the file based on time and creating a gzip.
         os.system("sort ../cws_data/%s -k 1 > ../cws_data/%s_sorted.tsv" % (filename, filename))
         os.system("gzip ../cws_data/%s_sorted.tsv" % filename)
+        os.system("rm ../cws_data/%s" % filename)
         print "Data File of name ../cws_data/%s_sorted.tsv.gz with %d user(s)." % (filename, no_users)
         print "**************************************"
     except Exception, e:
