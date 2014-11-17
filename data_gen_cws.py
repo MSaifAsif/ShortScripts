@@ -32,7 +32,7 @@ def main(no_users, logs_per_user, invalid_rows, format):
         user_ip_file = open("user_ips.csv", 'r')
         service_url_file = open("unique_urls_cws.csv", "r")
         useragent_file = open("unique_user_agents.csv", "r")
-        destip_file = open("unique_dest_ip.csv", "r")
+        destip_file = open("unique_dest_ip_1.csv", "r")
         no_users = int(no_users)
         logs_per_user = int(logs_per_user)
         invalid_rows = int(invalid_rows)
@@ -48,7 +48,8 @@ def main(no_users, logs_per_user, invalid_rows, format):
         else:
             print "\nInvalid Format. Please provide a value like CWS"
     except Exception, e:
-        logger.exception(e)
+        #logger.exception(e)
+        print str(e)
         sys.exit(1)
     finally:
         print "Exiting Program...\n"
@@ -82,12 +83,15 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
                 # Writing the Data Rows for each user. Parameterized Fields include Username, Service name, Sent Bytes,
                 # Received bytes, User Agent, destination IP and uri scheme. User Agensts are selected one for each user.
                 new_file.write(
-                    "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
+                    "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t%d\t%d\t200\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t180.143.124.98\t1278716032\t\n" % (
                         get_new_date(timestamp_format), users[user].strip(), users[user].strip(), services[service_list].split(":")[0],
                         services[service_list].split("//")[1].strip(), user_agent[agent_index].strip(), s_bytes, r_bytes,
-                        dest_ip[dest_index].strip(), users[user].strip()))
+                        dest_ip[dest_index].strip()))
+
                 user_index += 1
                 row_index += 1
+                dest_index += 1
+                agent_index += 1
 
                 # Since the total number of user agents may not be equal to the total number of users.
                 if agent_index == len(user_agent):
@@ -115,7 +119,7 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
             # To make a data row invalid, serviceip contains hardcoded * signs and 0.0.0.0 as destination IP.
             # Username is set by default to INVALID_User. These logs should not be detected during data processing.
             new_file.write(
-                "%s\t%s\t\tInvalid_User\tGET\t%s\t********************\t80\t\t\t%s\t-\t\t%d\t%d\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
+                "%s\t%s\t\tInvalid_User\tGET\t%s\t********************\t80\t\t\t%s\t-\t%d\t%d\t500\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t%s\t1278716032\t\n" % (
                     get_new_date(timestamp_format), users[user].strip(), services[invalid_rows].split(":")[0],
                     user_agent[invalid_rows].strip(), s_bytes, r_bytes, users[user].strip()))
 
@@ -123,10 +127,13 @@ def write_cws_file(filename, no_users, logs_per_user, invalid_rows, users, servi
 
         # Sorting the file based on time and creating a gzip.
         os.system("sort ../cws_data/%s -k 1 > ../cws_data/%s_sorted.tsv" % (filename, filename))
-        os.system("gzip ../cws_data/%s_sorted.tsv" % filename)
+        #os.system("gzip ../cws_data/%s_sorted.tsv" % filename)
+
+        # Removing the unsorted file.
         os.system("rm ../cws_data/%s" % filename)
+
         print "Data File of name ../cws_data/%s_sorted.tsv.gz with %d user(s)." % (filename, no_users)
-        print "**************************************"
+        print "**************** **********************"
     except Exception, e:
         #logger.exception(e)
         print str(e)
