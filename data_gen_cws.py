@@ -5,6 +5,7 @@ Author: "Asim Kazmi" <asim.kazmi@elastica.co>
 Rev : 1.0 2014-10-30
 Rev: 2.0 2014-11-11
 Rev: 3.0 2014-11-20
+Rev: 4.0 2014-11-26
 
 Desc: Firewall Data Generation Tool to create large Synthetic Log files for Different Firewalls.
 
@@ -12,6 +13,7 @@ Revisions:
 1.0 - Supports log generation for CWS In this revision. This rev does not include support for additional firewalls.
 2.0 - Support added for randomizing output of time stamp, useragents, destination IPs etc.
 3.0 - Added modularity in code and config file reading capability.
+4.0 - Added functions to bind service urls with destination IPs. Also removed some redundant variables.
 """
 
 import os
@@ -26,24 +28,22 @@ from time import gmtime, strftime
 import time
 from ConfigParser import SafeConfigParser
 
-
-# timestamp_format = '2014-11-01 00:00:01'
+# Global Declaration
 logger = logging.getLogger("Data Gen Logger:")
 
 
-def main(obj):
-    prepare_stream_logger(None,obj.logger_level)
+def main(genutility, logutility):
+    logutility.prepare_stream_logger(genutility.logger_level)
     try:
-        obj.prepare_data()
+        genutility.prepare_data()
     except Exception, e:
-        logger.exception(e)
+        ScriptLogger.exception(e)
 
 
 #----------------------------------------------------------------------------------------------------------------------#
 
 class DataGenUtility(object):
-
-    def __init__(self, config_file='data_gen.conf'):
+    def __init__(self, config_file='../config_files/data_gen.conf'):
         """
             Initializes required variables for data generation.
             :param config_file: Name of file that contains configuration parameters
@@ -61,13 +61,13 @@ class DataGenUtility(object):
         self.user_agents_per_user = ''
         self.logger_level = ''
         self.timeformat = ''
-
-
+        self.IPstart = ''
+        self.servicefile_path = ''
+        self.useragentfile_path = ''
         # Private helper function.
         self._parse_config(config_file)
 
-    #=================================================================================================================#
-
+#======================================================================================================================#
 
     def _parse_config(self, config_file):
         """
@@ -77,40 +77,40 @@ class DataGenUtility(object):
         """
         parser = SafeConfigParser()
         parser.read(config_file)
-        #print parser._sections
-        self.data_path = parser.get('System', 'data_path')
-        self.logger_path = parser.get('System', 'logger_path')
-        self.time_format = parser.get('System', 'time_format')
-        self.users = parser.get('System', 'users')
-        self.logs_per_user = parser.get('System', 'logs_per_user')
-        self.invalid_rows = parser.get('System', 'invalid_rows')
-        self.log_format = parser.get('System', 'log_format')
-        self.hours_per_day = parser.get('System', 'hours_per_day')
-        self.apps_per_user = parser.get('System', 'apps_per_user')
-        self.user_agents_per_user = parser.get('System', 'user_agents_per_user')
-        self.logger_level = parser.get('System', 'logger_level')
 
-    #=================================================================================================================#
+        self.data_path = parser.get('SYSTEM', 'DATA_PATH')
+        self.logger_path = parser.get('SYSTEM', 'LOGGER_PATH')
+        self.servicefile_path = parser.get('SYSTEM', 'URL_FILE_PATH')
+        self.useragentfile_path = parser.get('SYSTEM', 'AGENT_FILE_PATH')
+        self.time_format = parser.get('SYSTEM', 'TIME_FORMAT')
+        self.users = parser.get('SYSTEM', 'TOTAL_USERS')
+        self.logs_per_user = parser.get('SYSTEM', 'LOGS_PER_USER')
+        self.invalid_rows = parser.get('SYSTEM', 'INVALID_ROWS')
+        self.log_format = parser.get('SYSTEM', 'LOG_FORMAT')
+        self.hours_per_day = parser.get('SYSTEM', 'HOURS_PER_DAY')
+        self.apps_per_user = parser.get('SYSTEM', 'APPS_PER_USER')
+        self.user_agents_per_user = parser.get('SYSTEM', 'USER_AGENT_PER_USER')
+        self.logger_level = parser.get('SYSTEM', 'LOGGER_LEVEL')
+        self.IPstart = parser.get('SYSTEM', 'User_IP')
+        self.filename = str(int(time.time())) + '-day-' + str(self.time_format[8]) + str(self.time_format[9]) + '-data'
 
+#======================================================================================================================#
 
-    #def main(no_users, logs_per_user, invalid_rows, time, fformat):
     def prepare_data(self):
         try:
-            filename = str(int(time.time())) + "-day-" + str(self.time_format[8]) + str(self.time_format[9]) + "-data"
-            new_file = open(self.data_path + filename, 'wb')
-            service_url_file = open("unique_urls_cws.csv", "r")
-            useragent_file = open("unique_user_agents.csv", "r")
-            destip_file = open("dest_ips_valid.csv", "r")
+
+            new_file = open(self.data_path + self.filename, 'wb')
+            service_url_file = open(self.servicefile_path, "r")
+            useragent_file = open(self.useragentfile_path, "r")
             no_users = int(self.users)
             logs_per_user = int(self.logs_per_user)
             invalid_rows = int(self.invalid_rows)
             services = service_url_file.readlines()
             user_agent = useragent_file.readlines()
-            dest_ip = destip_file.readlines()
 
             # Verify the provided format from console input. CWS, WSA, ASA etc.
             if str(self.log_format) == "CWS":
-                self.write_cws_file(filename, services, user_agent, dest_ip, new_file)
+                self.write_cws_file(self.filename, services, user_agent, new_file)
             else:
                 print "\nInvalid Format. Please provide a value like CWS"
         except Exception, e:
@@ -119,14 +119,15 @@ class DataGenUtility(object):
         finally:
             print "Exiting Program...\n"
 
-    #=================================================================================================================#
+#======================================================================================================================#
 
 
-    def write_cws_file(self, filename, services, user_agent, dest_ip, new_file):
+    def write_cws_file(self, filename, services, user_agent, new_file):
         row_index = 0
         service_range_start = 1
         service_range_end = int(self.apps_per_user)
-        intipadd = 168427521
+
+        intip = int(ipaddress.IPv4Address(self.IPstart))
 
         try:
             print "**************************************"
@@ -137,9 +138,9 @@ class DataGenUtility(object):
             # User Loop to pick number of users from the user file based on the input value
             for user in range(0, int(self.users)):
                 user_index = 0
-                agent_index = 0
+                agent_index = int(self.user_agents_per_user)
                 dest_index = 0
-                userip = ipaddress.IPv4Address(intipadd)
+                userip = ipaddress.IPv4Address(intip)
                 # Loop to Generate Log per user.
 
                 for logs in range(0, int(self.logs_per_user)):
@@ -152,35 +153,34 @@ class DataGenUtility(object):
                     # Writing the Data Rows for each user. Parameterized Fields include Username, Service name, Sent Bytes,
                     # Received bytes, User Agent, destination IP and uri scheme. User Agensts are selected one for each user.
                     new_file.write(
-                        "%s\t%s\t\t%s\tGET\t%s\t%s\t80\t\t\t%s\t-\t%d\t%d\t200\timage/jpeg\t%s\tc:infr\tdefault\tallow\t\t\t180.143.124.98\t1278716032\t\n" % (
-                            self.get_new_date, str(userip), str(userip),
+                        "{0:s}\t{1:s}\t\t{2:s}\tGET\t{3:s}\t{4:s}\t80\t\t\t{5:s}\t-\t{6:d}\t{7:d}\t200\timage/jpeg\t{8:s}\tc:infr\tdefault\tallow\t\t\t180.143.124.98\t1278716032\t\n".format(
+                            self.get_new_date(), str(userip), str(userip),
                             services[service_list].split(":")[0],
-                            services[service_list].split("//")[1].strip(), user_agent[agent_index].strip(), s_bytes,
-                            r_bytes, dest_ip[dest_index].strip()))
+                            services[service_list].split("//")[1].split(",")[0].strip(),
+                            user_agent[
+                                random.randint((agent_index - (int(self.user_agents_per_user))), agent_index)].strip(),
+                            s_bytes,
+                            r_bytes, services[service_list].split(",")[1].strip()))
 
                     user_index += 1
                     row_index += 1
                     dest_index += 1
-                    agent_index += 1
+                    agent_index += int(self.user_agents_per_user)
 
                     # Since the total number of user agents may not be equal to the total number of users.
                     if agent_index >= len(user_agent) - 1:
                         agent_index = 0
 
-                    # Since the total number of destination IPs may not be equal to the total number of users.
-                    if dest_index >= len(dest_ip) - 1:
-                        dest_index = 0
+                service_range_start += int(self.apps_per_user)
 
-                service_range_start += 100
-
-                if service_range_start > 218001:
+                if service_range_start > (int(len(services)) - 1) - int(self.apps_per_user):
                     service_range_start = 0
-                    service_range_end = 0
-                if service_range_start == 218001:
+                    service_range_end = int(self.apps_per_user)
+                if service_range_start == (int(len(services)) - 1) - int(self.apps_per_user):
                     service_range_end += 89
                 else:
-                    service_range_end += 100
-                intipadd += 1
+                    service_range_end += int(self.apps_per_user)
+                intip += 1
 
                 # print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
             print "Valid Data Generation Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
@@ -198,43 +198,28 @@ class DataGenUtility(object):
 
                 new_file.write(
                     "%s\t10.0.1.1\t\tInvalid_User\tGET\t%s\t********************\t80\t\t\t%s\t-\t%d\t%d\t500\timage/jpeg\t0.0.0.0\tc:infr\tdefault\tallow\t\t\t190.180.100.73\t1278716032\t\n" % (
-                        self.get_new_date, services[random.randint(0, len(services) - 1)].split(":")[0],
+                        self.get_new_date(), services[random.randint(0, len(services) - 1)].split(":")[0],
                         user_agent[random.randint(0, len(user_agent) - 1)].strip(), s_bytes, r_bytes))
+
             print "Invalid Data Generation Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
             print "\nTotal Invalid Rows Added %d" % int(self.invalid_rows)
 
-            # Sorting the file based on time.
-            print "\nFile Sorting Started at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
-            os.system("sort %s%s -k 1 > %s%s_sorted.tsv" % (self.data_path, filename, self.data_path, filename))
-            print "File Sorting Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
+            self.os_operations(new_file)
 
-            # Create Zipped file.
-            print "\nStarting to Zip the file: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
-            os.system("gzip %s%s_sorted.tsv" % (self.data_path, filename))
-
-            endtime = strftime('%Y-%m-%d %H:%M:%S', gmtime())
-            print "File completely Zipped: %s\n" % endtime
-
-            # Removing the unsorted file.
-            os.system("rm ../cws_data/%s" % filename)
-
-            total_rows = int(row_index + int(self.invalid_rows))
-            print "Total Rows Added to file: %d" % total_rows
+            print "Total Rows Added to file: %d" % int(
+                (int(self.users) * int(self.logs_per_user)) + int(self.invalid_rows))
 
             print "Data File of name %s%s_sorted.tsv.gz with %d user(s)." % (self.data_path, filename, int(self.users))
             print "**************** **********************"
 
         except Exception, e:
             logger.exception(e)
-            #print str(e)
         finally:
             new_file.close()
 
-    #=================================================================================================================#
-
+#======================================================================================================================#
 
     # This function Generates Random time stamp witin a day range
-    @property
     def get_new_date(self):
         date, ttime = self.time_format.split()
         date_elems = date.split('-')
@@ -281,43 +266,64 @@ class DataGenUtility(object):
             year) + '-' + month_impl + '-' + day_impl + ' ' + hour_impl + ':' + min_impl + ':' + secs_impl
         return timeformat
 
-    #=================================================================================================================#
+#======================================================================================================================#
 
+
+    def os_operations(self, new_file):
+
+        # Sorting the file based on time.
+        print "\nFile Sorting Started at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
+        os.system("sort %s%s -k 1 > %s%s_sorted.tsv" % (self.data_path, self.filename, self.data_path, self.filename))
+        print "File Sorting Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
+
+        # Create Zipped file.
+        print "\nStarting to Zip the file: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
+        os.system("gzip %s%s_sorted.tsv" % (self.data_path, self.filename))
+
+        endtime = strftime('%Y-%m-%d %H:%M:%S', gmtime())
+        print "File completely Zipped: %s\n" % endtime
+
+        # Removing the unsorted file.
+        os.system("rm ../cws_data/%s" % self.filename)
+
+        return new_file
+
+
+#======================================================================================================================#
 
 #----------------------------------------------------------------------------------------------------------------------#
 
-def prepare_stream_logger(extra, logger_level):
+#----------------------------------------------------------------------------------------------------------------------#
 
-    """
-    Prepare a stream logger
+# For Script Logging
+class ScriptLogger(object):
+    def prepare_stream_logger(extra, logger_level):
+        """
+        Prepare a stream logger
 
-    :param logger: logger to use
-    :type logger: logging.Logger instance
+        :param logger: logger to use
+        :type logger: logging.Logger instance
 
-    :param extra: Extra information to append in the log. Is a string
-    :type extra: str
+        :param extra: Extra information to append in the log. Is a string
+        :type extra: str
 
-    :param filename: Filename to be used to logging. Absolute path needs to be given otherwise in cwd
-    :type filename: str
+        :param filename: Filename to be used to logging. Absolute path needs to be given otherwise in cwd
+        :type filename: str
 
-    :param debug_level: Debug level to set on the logger
-    :type debug_level: one of logging.DEBUG, logging.ERROR, logging.INFO, logging.WARNING
-    """
+        :param debug_level: Debug level to set on the logger
+        :type debug_level: one of logging.DEBUG, logging.ERROR, logging.INFO, logging.WARNING
+        """
 
-    logger.setLevel(logger_level)
-    #logger.addFilter(UserLogFilter(extra))
+        logger.setLevel(logger_level)
+        #logger.addFilter(UserLogFilter(extra))
 
-    sh = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
-    sh.setFormatter(formatter)
-    logger.addHandler(sh)
+        sh = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
 
 if __name__ == '__main__':
-    """
-    if len(sys.argv) == 2:
-        main(sys.argv[1])
-    else:
-        print "Usage: python data_gen_cws_.py"
-    """
-    runner = DataGenUtility()
-    main(runner)
+    datagenrunner = DataGenUtility()
+    logrunner = ScriptLogger()
+    main(datagenrunner, logrunner)

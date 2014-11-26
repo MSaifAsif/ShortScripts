@@ -1,17 +1,4 @@
-#!/bin/python
-
-"""
- Author: "Asim Kazmi" <asim.kazmi@elastica.co>
-Rev : 1.0 2014-10-30
-
-
-Desc: A Simple function to get valid IPs for a given set of urls.
-
-Revisions:
-1.0 - Takes a text file with urls separated on each line and provides valid IP addresses of URLS.
-
-"""
-
+__author__ = 'Asimkazmi'
 
 
 import socket
@@ -21,19 +8,27 @@ import sys
 def main(file_path):
     try:
         addfile = open(file_path, "r")
-        writefile = open("dest_ips_valid.csv", "w")
+        urlfile = open(file_path,'r')
+        writefile = open("valid_url_dest_ips.csv", "w")
         urls = addfile.readlines()
 
         # Reads the urls line by line and check if its valid. URLs should not contain protocol like http or https.
         for allurls in xrange(0, len(urls) - 1):
+            url = urls[allurls].split('/')[2].strip()
+
+            if str(urls[allurls].split(':')[0].strip()) == 'http':
+                proto = 80
+            else:
+                proto = 443
             try:
-                destip = socket.getaddrinfo(urls[allurls].strip(), 80, 0, 0, socket.IPPROTO_TCP)
+                destip = socket.getaddrinfo(url, proto, 0, 0, socket.IPPROTO_TCP)
             except Exception, msg:
                 try:
-                    destip = socket.getaddrinfo(urls[allurls].strip(), 443, 0, 0, socket.IPPROTO_TCP)
+                    destip = socket.getaddrinfo(url, proto, 0, 0, socket.IPPROTO_TCP)
                     print "************ " + destip
-                except Exception:
-                    print urls[allurls]
+                except Exception, msg:
+                    #print msg
+                    writefile.write("%s, \n" % urls[allurls].strip())
                     continue
 
             # Based on the output of getaddrinfo, extract the IP out of complete return string tuple.
@@ -42,7 +37,7 @@ def main(file_path):
                     if isinstance(inner_tuple, __builtins__.tuple):
                         if len(inner_tuple) == 2:
                             first_val, second_val = inner_tuple
-                            writefile.write("%s\n" % first_val)
+                            writefile.write("%s,%s\n" % (urls[allurls].strip(), first_val))
 
     except Exception, e:
         print str(e)
