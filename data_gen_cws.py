@@ -202,7 +202,8 @@ class DataGenUtility(object):
                     else:
                         service_range_end += int(self.apps_per_user)
                     intip += 1
-
+                    if agent_index >= int(len(user_agent) - 1):
+                        agent_index = 0
                 # print "Total Rows Added for user %s : %d" % (users[user].strip(), user_index)
 
 
