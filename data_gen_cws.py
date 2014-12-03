@@ -7,6 +7,7 @@ Rev: 2.0 2014-11-11
 Rev: 3.0 2014-11-20
 Rev: 4.0 2014-11-26
 Rev: 5.0 2014-12-01
+Rev: 6.0 2014-12-03
 
 Desc: Firewall Data Generation Tool to create large Synthetic Log files for Different Firewalls.
 
@@ -16,6 +17,7 @@ Revisions:
 3.0 - Added modularity in code and config file reading capability.
 4.0 - Added functions to bind service urls with destination IPs. Also removed some redundant variables.
 5.0 - Added support for generating data for multiple days. Added support for WSA file format.
+6.0 - Added support for ASA file format for generating only IP based discovery logs.
 """
 
 import os
@@ -33,7 +35,7 @@ from ConfigParser import SafeConfigParser
 # Global Declaration
 logger = logging.getLogger("Data Gen Logger:")
 
-
+# Main Function to Start it All.
 def main(genutility, logutility):
     logutility.prepare_stream_logger(genutility.logger_level)
     try:
@@ -41,11 +43,10 @@ def main(genutility, logutility):
     except Exception, e:
         ScriptLogger.exception(e)
 
-
-#----------------------------------------------------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------------------------------------------------#
 
 class DataGenUtility(object):
-    def __init__(self, config_file='data_gen.conf'):
+    def __init__(self, config_file='../config_files/data_gen.conf'):
         """
             Initializes required variables for data generation.
             :param config_file: Name of file that contains configuration parameters
@@ -86,7 +87,7 @@ class DataGenUtility(object):
         self.logger_path = parser.get('SYSTEM', 'LOGGER_PATH')
         self.servicefile_path = parser.get('SYSTEM', 'URL_FILE_PATH')
         self.useragentfile_path = parser.get('SYSTEM', 'AGENT_FILE_PATH')
-        self.time_format = parser.get('SYSTEM', 'TIME_FORMAT')
+        self.time_format = parser.get('SYSTEM', 'START_FORMAT')
         self.no_of_days = parser.get('SYSTEM', 'NO_OF_DAYS')
         self.users = parser.get('SYSTEM', 'TOTAL_USERS')
         self.logs_per_user = parser.get('SYSTEM', 'LOGS_PER_USER')
@@ -98,9 +99,8 @@ class DataGenUtility(object):
         self.logger_level = parser.get('SYSTEM', 'LOGGER_LEVEL')
         self.IPstart = parser.get('SYSTEM', 'USER_IP')
         self.zip_flag = parser.get('SYSTEM', 'ZIP_FILE')
-        self.filename = str(int(time.time())) + '-day-' + str(self.time_format[8]) + str(self.time_format[9]) + '-data'
-        self.new_file = open(self.data_path + self.filename, 'wb')
-
+        self.filename = str(strftime("%Y-%m-%dT%H:%M:%S")) + self.no_of_days + '-days-' + self.log_format + '-data'
+        self.new_file = open(self.data_path + self.filename, 'w')
 
     #==================================================================================================================#
 
@@ -118,7 +118,7 @@ class DataGenUtility(object):
             invalid_rows = int(self.invalid_rows)
             services = service_url_file.readlines()
             user_agent = useragent_file.readlines()
-            if str(self.log_format) != 'CWS' and str(self.log_format) != 'WSA':
+            if str(self.log_format) != 'CWS' and str(self.log_format) != 'WSA' and str(self.log_format) != 'ASA':
                 print("Log Format Does Not Match the Required Formats.")
             else:
                 self.create_data(services, user_agent)
@@ -131,7 +131,6 @@ class DataGenUtility(object):
             print "Exiting Program...\n"
 
     #==================================================================================================================#
-
 
     def create_data(self, services, user_agent):
         """
@@ -177,10 +176,18 @@ class DataGenUtility(object):
                         agent_feed = user_agent[(random.randint(start, agent_index))].strip()
                         dest_feed = services[service_list].split(",")[1].strip()
 
+                        if proto_feed == "http":
+                            proto_id = '80'
+                        else:
+                            proto_id = '443'
                         if str(self.log_format) == "CWS":
-                            self.write_cws_file(days, user_ip, proto_feed, service_feed, agent_feed, dest_feed, s_bytes, r_bytes)
+                            self.write_cws_file(days, user_ip, proto_feed, service_feed, agent_feed, dest_feed, s_bytes,
+                                                r_bytes)
                         elif str(self.log_format) == "WSA":
-                            self.write_wsa_file(days, user_ip, proto_feed, service_feed, agent_feed, dest_feed, s_bytes, r_bytes)
+                            self.write_wsa_file(days, user_ip, proto_feed, service_feed, agent_feed, dest_feed, s_bytes,
+                                                r_bytes)
+                        elif str(self.log_format) == "ASA":
+                            self.write_asa_file(days, user_ip, service_feed, dest_feed, s_bytes, r_bytes, proto_id)
                         else:
                             print "No File generated"
                             break
@@ -198,7 +205,7 @@ class DataGenUtility(object):
                         service_range_start = 0
                         service_range_end = int(self.apps_per_user)
                     if service_range_start == (int(len(services)) - 1) - int(self.apps_per_user):
-                        service_range_end += 89
+                        service_range_end += 46
                     else:
                         service_range_end += int(self.apps_per_user)
                     intip += 1
@@ -223,7 +230,9 @@ class DataGenUtility(object):
                         break
 
             print "Data Generation Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
-            self.os_operations(self.new_file)
+
+            self.new_file.close()
+            self.os_operations()
 
             print "\nTotal Valid Rows Added: %d" % row_index
             print "Total Invalid Rows Added %d" % int(self.invalid_rows)
@@ -235,8 +244,8 @@ class DataGenUtility(object):
             else:
                 zip_ext = ''
 
-            print "Data File of name %s%s_sorted.tsv%s with %d user(s)." % (
-                    self.data_path, self.filename, zip_ext, int(self.users))
+            print "Data File of name %s%s_sorted.log%s with %d user(s)." % (
+                self.data_path, self.filename, zip_ext, int(self.users))
             print "**************************************"
 
         except Exception, e:
@@ -245,7 +254,6 @@ class DataGenUtility(object):
             self.new_file.close()
 
     #==================================================================================================================#
-
 
     def write_cws_file(self, days, user_ip, proto_feed, service_feed, agent_feed, dest_feed, s_bytes, r_bytes):
         """
@@ -289,6 +297,27 @@ class DataGenUtility(object):
                 self.get_new_date(days), str(user_ip), (s_bytes + r_bytes), service_feed, str(user_ip),
                 dest_feed, agent_feed))
 
+    #==================================================================================================================#
+
+    def write_asa_file(self, days, user_ip, service_feed, dest_feed, s_bytes, r_bytes, proto_id):
+        """
+        Writing the Data Rows for each user. Parameterized Fields include Username, Service name, Sent Bytes,
+        Received bytes, User Agent, destination IP and uri scheme. User Agensts are selected one for each user.
+        Verify the provided format from console input. CWS, WSA, ASA etc.
+
+        :param user_ip:
+        :param service_feed:
+        :param dest_feed:
+        :param s_bytes:
+        :param r_bytes:
+        :param proto_id:
+        :return:
+        """
+        duration = random.randint(0,9)
+        bytes = int(s_bytes) + int(r_bytes)
+        self.new_file.write(
+            '%s %s %%ASA-6-30214: Teardown TCP connection %d for outside:%s/%s to inside:%s/1024 duration 0:0%d:00 bytes %d TCP FINs\n' % (
+                self.get_new_date(days).strip(), str(user_ip), bytes, proto_id, dest_feed, str(user_ip), duration, bytes))
 
     #==================================================================================================================#
 
@@ -328,7 +357,7 @@ class DataGenUtility(object):
 
         self.new_file.write(
             '%s 222 INVALID_USER TCP_CLIENT_REFRESH_MISS 200 %d POST somegoodwebsite.com INVALID_USER DIRECT 0.0.0.0 application/image DEFAULT_CASE_12-DefaultGroup-DefaultGroup-NONE-NONE-NONE-DefaultGroup <-,-,-,""-"",-,-,-,-,""-"",-,-,-,""-"",-,-,""-"",""-"",-,-,-,-,""-"",""-"",""-"",""-"",""-"",""-"",55.50,0,-,""-"",""-""> - %s\n' % (
-                self.get_new_date(), (s_bytes + r_bytes), agent_feed))
+                self.get_new_date(days), (s_bytes + r_bytes), agent_feed))
 
     #==================================================================================================================#
 
@@ -389,45 +418,42 @@ class DataGenUtility(object):
             min_impl = '0' + min_impl
 
         if str(self.log_format) == "CWS":
-            timeformat = str(
+            new_timeformat = str(
                 year) + '-' + month_impl + '-' + day_impl + ' ' + hour_impl + ':' + min_impl + ':' + secs_impl
         elif str(self.log_format) == "WSA":
-            timeformat = (year, int(month_impl), int(day_impl), int(hour_impl), int(min_impl), int(secs_impl))
-            timeformat = timegm(timeformat)
-        return timeformat
+            new_timeformat = (year, int(month_impl), int(day_impl), int(hour_impl), int(min_impl), int(secs_impl))
+            new_timeformat = timegm(new_timeformat)
+        elif str(self.log_format) == "ASA":
+            new_timeformat = str(
+                year) + '-' + month_impl + '-' + day_impl + 'T' + hour_impl + ':' + min_impl + ':' + secs_impl + '-07:00'
+        return new_timeformat
 
     #==================================================================================================================#
 
-
-    def os_operations(self, new_file):
+    def os_operations(self):
         """
         :param new_file:
         :return:
         """
         # Sorting the file based on time.
         print "\nFile Sorting Started at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
-        os.system(
-            "sort %s%s -k 1 > %s%s_sorted.tsv" % (self.data_path, self.filename, self.data_path, self.filename))
+        os.system("sort %s%s -k 1 > %s%s_sorted.log" % (self.data_path, self.filename, self.data_path, self.filename))
         print "File Sorting Finished at: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
 
         # Create Zipped file.
         if str(self.zip_flag) == 'True':
             print "\nStarting to Zip the file: " + strftime('%Y-%m-%d %H:%M:%S', gmtime())
-            os.system("gzip %s%s" % (self.data_path, self.filename))
+            os.system("gzip %s%s_sorted.log" % (self.data_path, self.filename))
+            endtime = strftime('%Y-%m-%d %H:%M:%S', gmtime())
+            print "File completely Zipped: %s\n" % endtime
 
-        endtime = strftime('%Y-%m-%d %H:%M:%S', gmtime())
-        #print "File completely Zipped: %s\n" % endtime
 
         # Removing the unsorted file.
-        os.system("rm ../cws_data/%s" % self.filename)
-
-        return new_file
-
+        os.system("rm %s%s" % (self.data_path, self.filename))
 
     #==================================================================================================================#
 
 #----------------------------------------------------------------------------------------------------------------------#
-
 
 class ScriptLogger(object):
     def prepare_stream_logger(extra, logger_level):
@@ -456,7 +482,6 @@ class ScriptLogger(object):
         logger.addHandler(sh)
 
 #----------------------------------------------------------------------------------------------------------------------#
-
 
 if __name__ == '__main__':
     datagenrunner = DataGenUtility()
