@@ -314,9 +314,9 @@ class DataGenUtility(object):
         :return:
         """
         duration = random.randint(0,9)
-        bytes = int(s_bytes) + int(r_bytes)
+        bytes = int(s_bytes) * int(r_bytes)
         self.new_file.write(
-            '%s %s %%ASA-6-30214: Teardown TCP connection %d for outside:%s/%s to inside:%s/1024 duration 0:0%d:00 bytes %d TCP FINs\n' % (
+            '%s %s %%ASA-6-302014: Teardown TCP connection %d for outside:%s/%s to inside:%s/1024 duration 0:0%d:00 bytes %d TCP FINs\n' % (
                 self.get_new_date(days).strip(), str(user_ip), bytes, proto_id, dest_feed, str(user_ip), duration, bytes))
 
     #==================================================================================================================#
@@ -378,7 +378,32 @@ class DataGenUtility(object):
         mins = int(time_elems[1])
         secs = int(time_elems[2])
 
-        if day == 30:
+        if month == 1:
+            mnth = "Jan"   
+        elif month == 2:
+            mnth = "Feb"           
+        elif month == 3:
+            mnth = "Mar"
+        elif month == 4:
+            mnth = "Apr"
+        elif month == 5:
+            mnth = "May"
+        elif month == 6:
+            mnth = "Jun"
+        elif month == 7:
+            mnth = "Jul"
+        elif month == 8:
+            mnth = "Aug"
+        elif month == 9:
+            mnth = "Sep"
+        elif month == 10:
+            mnth = "Oct"
+        elif month == 11:
+            mnth = "Nov"
+        elif month == 12:
+            mnth = "Dec"
+
+        if days >= 29:
             day = 1
             month += 1
         else:
@@ -424,8 +449,7 @@ class DataGenUtility(object):
             new_timeformat = (year, int(month_impl), int(day_impl), int(hour_impl), int(min_impl), int(secs_impl))
             new_timeformat = timegm(new_timeformat)
         elif str(self.log_format) == "ASA":
-            new_timeformat = str(
-                year) + '-' + month_impl + '-' + day_impl + 'T' + hour_impl + ':' + min_impl + ':' + secs_impl + '-07:00'
+            new_timeformat = str(mnth) + ' ' + day_impl+ ' ' + hour_impl + ':' + min_impl + ':' + secs_impl
         return new_timeformat
 
     #==================================================================================================================#
